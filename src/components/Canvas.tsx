@@ -239,32 +239,45 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>(({
       if (!ctx) return null
 
       if (rotation !== 0) {
-        // For rotated images, we need to render the rotated image first
-        // then crop from the center of that rotated render
+        // Match the display rendering exactly
         const img = imageRef.current
         const scaledWidth = img.naturalWidth * scale
         const scaledHeight = img.naturalHeight * scale
 
-        // Calculate where the rotated image center is relative to crop box
-        const imageCenterX = imagePosition.x + scaledWidth / 2
-        const imageCenterY = imagePosition.y + scaledHeight / 2
-        
-        // Offset from crop box center to image center
-        const offsetX = imageCenterX - cropBoxCenterX
-        const offsetY = imageCenterY - cropBoxCenterY
+        // Create a large temporary canvas to render the full rotated scene
+        const tempCanvas = document.createElement('canvas')
+        tempCanvas.width = canvasWidth
+        tempCanvas.height = canvasHeight
+        const tempCtx = tempCanvas.getContext('2d')
+        if (!tempCtx) return null
 
-        // Draw rotated image centered in export canvas
-        ctx.save()
-        ctx.translate(cropWidth / 2 - offsetX, cropHeight / 2 - offsetY)
-        ctx.rotate((rotation * Math.PI) / 180)
-        ctx.drawImage(
+        // Draw the rotated image exactly as displayed on screen
+        tempCtx.save()
+        const centerX = imagePosition.x + scaledWidth / 2
+        const centerY = imagePosition.y + scaledHeight / 2
+        tempCtx.translate(centerX, centerY)
+        tempCtx.rotate((rotation * Math.PI) / 180)
+        tempCtx.drawImage(
           img,
           -scaledWidth / 2,
           -scaledHeight / 2,
           scaledWidth,
           scaledHeight
         )
-        ctx.restore()
+        tempCtx.restore()
+
+        // Extract just the crop box area from temp canvas
+        ctx.drawImage(
+          tempCanvas,
+          cropBoxX,
+          cropBoxY,
+          cropWidth,
+          cropHeight,
+          0,
+          0,
+          cropWidth,
+          cropHeight
+        )
       } else {
         // No rotation - use simple rectangular crop
         const sourceX = (cropBoxX - imagePosition.x) / scale
