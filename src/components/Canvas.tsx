@@ -15,6 +15,7 @@ interface CanvasProps {
   onImageLoad?: (width: number, height: number) => void
   onPositionChange?: (x: number, y: number) => void
   onScaleChange?: (scale: number) => void
+  onCropResize?: (width: number, height: number) => void
   onDragOver?: (e: React.DragEvent) => void
   onDrop?: (e: React.DragEvent) => void
 }
@@ -44,13 +45,17 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>(({
   onImageLoad,
   onPositionChange,
   onScaleChange,
+  onCropResize,
   onDragOver,
   onDrop
 }, ref) => {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const imageRef = useRef<HTMLImageElement | null>(null)
   const isDraggingRef = useRef(false)
+  const isResizingRef = useRef(false)
   const dragStartRef = useRef({ x: 0, y: 0 })
+  const resizeStartRef = useRef({ width: 0, height: 0, mouseX: 0, mouseY: 0 })
+  const tempResizeRef = useRef({ width: 0, height: 0 })
 
   // Load image when imageData changes
   useEffect(() => {
@@ -117,11 +122,13 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>(({
       }
     }
 
-    // Draw crop box
+    // Draw crop box (use temp dimensions if resizing)
+    const activeCropWidth = isResizingRef.current ? tempResizeRef.current.width : cropWidth
+    const activeCropHeight = isResizingRef.current ? tempResizeRef.current.height : cropHeight
     const cropBoxCenterX = canvasWidth / 2
     const cropBoxCenterY = canvasHeight / 2
-    const cropBoxX = cropBoxCenterX - cropWidth / 2
-    const cropBoxY = cropBoxCenterY - cropHeight / 2
+    const cropBoxX = cropBoxCenterX - activeCropWidth / 2
+    const cropBoxY = cropBoxCenterY - activeCropHeight / 2
 
     // Draw dark overlay outside crop box
     ctx.save()
@@ -130,16 +137,32 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>(({
     // Top
     ctx.fillRect(0, 0, canvasWidth, cropBoxY)
     // Bottom
-    ctx.fillRect(0, cropBoxY + cropHeight, canvasWidth, canvasHeight)
+    ctx.fillRect(0, cropBoxY + activeCropHeight, canvasWidth, canvasHeight)
     // Left
-    ctx.fillRect(0, cropBoxY, cropBoxX, cropHeight)
+    ctx.fillRect(0, cropBoxY, cropBoxX, activeCropHeight)
     // Right
-    ctx.fillRect(cropBoxX + cropWidth, cropBoxY, canvasWidth, cropHeight)
+    ctx.fillRect(cropBoxX + activeCropWidth, cropBoxY, canvasWidth, activeCropHeight)
 
     // Draw white border
     ctx.strokeStyle = '#ffffff'
     ctx.lineWidth = 3
-    ctx.strokeRect(cropBoxX, cropBoxY, cropWidth, cropHeight)
+    ctx.strokeRect(cropBoxX, cropBoxY, activeCropWidth, activeCropHeight)
+    
+    // Draw resize handle (red circle at bottom-right corner)
+    const handleRadius = 8
+    const handleX = cropBoxX + activeCropWidth
+    const handleY = cropBoxY + activeCropHeight
+    
+    ctx.fillStyle = '#ff0000'
+    ctx.beginPath()
+    ctx.arc(handleX, handleY, handleRadius, 0, Math.PI * 2)
+    ctx.fill()
+    
+    // Add white border to make it stand out
+    ctx.strokeStyle = '#ffffff'
+    ctx.lineWidth = 2
+    ctx.stroke()
+    
     ctx.restore()
   }, [imagePosition, scale, rotation, cropWidth, cropHeight])
 
@@ -169,26 +192,79 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>(({
 
   // Mouse drag handlers
   const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (!imageRef.current) return
-    
-    isDraggingRef.current = true
-    dragStartRef.current = {
-      x: e.clientX - imagePosition.x,
-      y: e.clientY - imagePosition.y
+    const canvas = canvasRef.current
+    if (!canvas) return
+
+    const rect = canvas.getBoundingClientRect()
+    const scaleX = canvas.width / rect.width
+    const scaleY = canvas.height / rect.height
+    const mouseX = (e.clientX - rect.left) * scaleX
+    const mouseY = (e.clientY - rect.top) * scaleY
+
+    const canvasWidth = canvas.width
+    const canvasHeight = canvas.height
+    const cropBoxCenterX = canvasWidth / 2
+    const cropBoxCenterY = canvasHeight / 2
+    const cropBoxX = cropBoxCenterX - cropWidth / 2
+    const cropBoxY = cropBoxCenterY - cropHeight / 2
+
+    // Check if clicking on resize handle (bottom-right corner)
+    const handleRadius = 8
+    const handleX = cropBoxX + cropWidth
+    const handleY = cropBoxY + cropHeight
+    const distToHandle = Math.sqrt(Math.pow(mouseX - handleX, 2) + Math.pow(mouseY - handleY, 2))
+
+    console.log('Mouse down:', { mouseX, mouseY, handleX, handleY, distToHandle, threshold: handleRadius + 10 })
+
+    if (distToHandle < handleRadius + 10) {
+      // Start resizing
+      console.log('Starting resize')
+      isResizingRef.current = true
+      resizeStartRef.current = {
+        width: cropWidth,
+        height: cropHeight,
+        mouseX: e.clientX,
+        mouseY: e.clientY
+      }
+    } else if (imageRef.current) {
+      // Start dragging image
+      isDraggingRef.current = true
+      dragStartRef.current = {
+        x: e.clientX - imagePosition.x,
+        y: e.clientY - imagePosition.y
+      }
     }
   }
 
   const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (!isDraggingRef.current || !imageRef.current) return
-
-    const newX = e.clientX - dragStartRef.current.x
-    const newY = e.clientY - dragStartRef.current.y
-    
-    onPositionChange?.(newX, newY)
+    if (isResizingRef.current) {
+      // Handle crop box resize - store temp values, don't update parent yet
+      const deltaX = e.clientX - resizeStartRef.current.mouseX
+      const deltaY = e.clientY - resizeStartRef.current.mouseY
+      
+      tempResizeRef.current.width = Math.max(100, resizeStartRef.current.width + deltaX)
+      tempResizeRef.current.height = Math.max(100, resizeStartRef.current.height + deltaY)
+      
+      // Force a re-render to show the visual change
+      render()
+    } else if (isDraggingRef.current && imageRef.current) {
+      // Handle image drag
+      const newX = e.clientX - dragStartRef.current.x
+      const newY = e.clientY - dragStartRef.current.y
+      
+      onPositionChange?.(newX, newY)
+    }
   }
 
   const handleMouseUp = () => {
+    // If we were resizing, apply the final dimensions
+    if (isResizingRef.current) {
+      onCropResize?.(Math.round(tempResizeRef.current.width), Math.round(tempResizeRef.current.height))
+      console.log('Resize complete:', tempResizeRef.current)
+    }
+    
     isDraggingRef.current = false
+    isResizingRef.current = false
   }
 
   // Mouse wheel zoom

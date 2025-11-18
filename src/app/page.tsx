@@ -73,7 +73,7 @@ export default function Home() {
     }
   }
 
-  const handlePositionChange = (width: number, height: number) => {
+  const handleCropResize = (width: number, height: number) => {
     setCropWidth(width)
     setCropHeight(height)
   }
@@ -284,6 +284,7 @@ export default function Home() {
         onImageLoad={handleImageLoad}
         onPositionChange={(x, y) => setImagePosition({ x, y })}
         onScaleChange={setScale}
+        onCropResize={handleCropResize}
         onDragOver={handleDragOver}
         onDrop={handleDrop}
       >
@@ -299,10 +300,12 @@ export default function Home() {
         )}
         
         <TopLeftMenu 
-          onPositionChange={handlePositionChange}
+          onPositionChange={handleCropResize}
           onHelpClick={() => setShowHelp(true)}
           onRemoveImage={handleRemoveImage}
           imageLoaded={imageLoaded}
+          cropWidth={cropWidth}
+          cropHeight={cropHeight}
           onZoomSensitivityChange={setZoomSensitivity}
         />
         <TopRightMenu 

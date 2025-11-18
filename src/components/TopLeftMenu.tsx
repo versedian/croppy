@@ -11,6 +11,8 @@ interface TopLeftMenuProps {
   imageLoaded?: boolean
   initialX?: number
   initialY?: number
+  cropWidth?: number
+  cropHeight?: number
   onZoomSensitivityChange?: (sensitivity: number) => void
 }
 
@@ -21,6 +23,8 @@ export default function TopLeftMenu({
   imageLoaded = false,
   initialX = 0, 
   initialY = 0,
+  cropWidth,
+  cropHeight,
   onZoomSensitivityChange
 }: TopLeftMenuProps) {
   // Load from localStorage on mount, fall back to defaults (832 x 1216)
@@ -54,6 +58,18 @@ export default function TopLeftMenu({
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // Update local state when external props change (e.g., from resize handle)
+  useEffect(() => {
+    if (cropWidth !== undefined) {
+      setX(cropWidth.toString())
+      localStorage.setItem('croppy_lastX', cropWidth.toString())
+    }
+    if (cropHeight !== undefined) {
+      setY(cropHeight.toString())
+      localStorage.setItem('croppy_lastY', cropHeight.toString())
+    }
+  }, [cropWidth, cropHeight])
 
   const handleXChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value
