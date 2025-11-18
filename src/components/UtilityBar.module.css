@@ -1,0 +1,125 @@
+.barContainer {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background-color: #2a2a2a;
+  border-top: 1px solid #444;
+}
+
+.rotationRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 24px;
+  border-bottom: 1px solid #444;
+}
+
+.rotationLabel {
+  font-size: 12px;
+  color: #b0b0b0;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  min-width: 70px;
+}
+
+.rotationSlider {
+  -webkit-appearance: none;
+  appearance: none;
+  flex: 1;
+  height: 6px;
+  background: #1a1a1a;
+  border: 1px solid #444;
+  border-radius: 3px;
+  outline: none;
+  cursor: pointer;
+}
+
+.rotationSlider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  background: #ffffff;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.rotationSlider::-webkit-slider-thumb:hover {
+  background: #e0e0e0;
+  transform: scale(1.1);
+}
+
+.rotationSlider::-webkit-slider-thumb:active {
+  background: #c0c0c0;
+  transform: scale(0.95);
+}
+
+.rotationSlider::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  background: #ffffff;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.rotationSlider::-moz-range-thumb:hover {
+  background: #e0e0e0;
+  transform: scale(1.1);
+}
+
+.rotationSlider::-moz-range-thumb:active {
+  background: #c0c0c0;
+  transform: scale(0.95);
+}
+
+.bar {
+  height: 52px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 24px;
+  gap: 16px;
+}
+
+.section {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+}
+
+.section:first-child {
+  flex: 0 0 auto;
+}
+
+.section:nth-child(2) {
+  flex: 1;
+  justify-content: center;
+}
+
+.section:last-child {
+  flex: 0 0 auto;
+}
+
+.label {
+  color: #b0b0b0;
+  font-weight: 500;
+}
+
+.value {
+  color: #e0e0e0;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-weight: 500;
+  min-width: 80px;
+}
+
+.separator {
+  color: #444;
+  margin: 0 8px;
+  font-weight: 300;
+}
