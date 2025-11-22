@@ -1,3 +1,7 @@
+# Live Preview #
+
+[https://croppy.eth1c.com/](https://croppy.eth1c.com/)
+
 # Croppy
 
 **A privacy-first image cropping tool that runs entirely in your browser.**
