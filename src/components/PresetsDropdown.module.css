@@ -1,11 +1,11 @@
 .container {
   position: relative;
-  margin-top: 8px;
+  min-width: 250px;
 }
 
 .toggleButton {
   width: 100%;
-  padding: 8px 12px;
+  padding: 8px 16px;
   background-color: #1a1a1a;
   border: 1px solid #444;
   border-radius: 4px;
@@ -14,6 +14,7 @@
   cursor: pointer;
   transition: all 0.2s ease;
   text-align: left;
+  white-space: nowrap;
 }
 
 .toggleButton:hover {
@@ -26,6 +27,7 @@
   top: 100%;
   left: 0;
   right: 0;
+  min-width: 250px;
   background-color: #2a2a2a;
   border: 1px solid #444;
   border-top: none;
@@ -33,6 +35,15 @@
   z-index: 50;
   max-height: 400px;
   overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.dropdownUp {
+  top: auto;
+  bottom: 100%;
+  border-top: 1px solid #444;
+  border-bottom: none;
+  border-radius: 4px 4px 0 0;
 }
 
 .addButton {
@@ -135,6 +146,7 @@
   padding: 8px 12px;
   border-bottom: 1px solid #333;
   transition: background-color 0.2s ease;
+  min-width: 0;
 }
 
 .presetItem:last-child {
@@ -156,6 +168,7 @@
 
 .presetButton {
   flex: 1;
+  min-width: 0;
   padding: 6px 8px;
   background-color: transparent;
   border: none;
@@ -164,6 +177,9 @@
   cursor: pointer;
   text-align: left;
   transition: all 0.2s ease;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .presetButton:hover {

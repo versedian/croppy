@@ -12,6 +12,7 @@ interface Preset {
 
 interface PresetsDropdownProps {
   onPresetSelect?: (width: number, height: number) => void
+  expandUp?: boolean
 }
 
 const DEFAULT_PRESETS: Preset[] = [
@@ -21,7 +22,7 @@ const DEFAULT_PRESETS: Preset[] = [
   { id: 'preset-grok-landscape', name: 'Grok Landscape', width: 640, height: 480 },
 ]
 
-export default function PresetsDropdown({ onPresetSelect }: PresetsDropdownProps) {
+export default function PresetsDropdown({ onPresetSelect, expandUp = false }: PresetsDropdownProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [presets, setPresets] = useState<Preset[]>(DEFAULT_PRESETS)
   const [draggedId, setDraggedId] = useState<string | null>(null)
@@ -115,7 +116,7 @@ export default function PresetsDropdown({ onPresetSelect }: PresetsDropdownProps
       </button>
 
       {isOpen && (
-        <div className={styles.dropdown}>
+        <div className={`${styles.dropdown} ${expandUp ? styles.dropdownUp : ''}`}>
           <button className={styles.addButton} onClick={() => setIsAddingPreset(!isAddingPreset)}>
             + Add Preset
           </button>

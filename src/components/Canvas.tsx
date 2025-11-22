@@ -6,13 +6,18 @@ import styles from './Canvas.module.css'
 interface CanvasProps {
   children?: React.ReactNode
   imageData?: string | null
+  videoData?: string | null
+  mediaType?: 'image' | 'video' | null
   imagePosition: { x: number; y: number }
   cropWidth: number
   cropHeight: number
   scale: number
   rotation?: number
   zoomSensitivity?: number
+  positionInitialized?: boolean
+  isPlaying?: boolean
   onImageLoad?: (width: number, height: number) => void
+  onVideoLoad?: (width: number, height: number, duration: number) => void
   onPositionChange?: (x: number, y: number) => void
   onScaleChange?: (scale: number) => void
   onCropResize?: (width: number, height: number) => void
@@ -24,10 +29,13 @@ export interface CanvasRef {
   getCroppedCanvas: () => HTMLCanvasElement | null
   getCanvasState: () => {
     image: HTMLImageElement | null
+    video: HTMLVideoElement | null
+    mediaType: 'image' | 'video' | null
     position: { x: number; y: number }
     scale: number
     cropBox: { centerX: number; centerY: number; width: number; height: number }
   }
+  getVideoElement: () => HTMLVideoElement | null
 }
 
 const DEFAULT_CROP_BOX_WIDTH = 800
@@ -36,13 +44,18 @@ const DEFAULT_CROP_BOX_HEIGHT = 600
 const Canvas = forwardRef<CanvasRef, CanvasProps>(({
   children,
   imageData = null,
+  videoData = null,
+  mediaType = null,
   imagePosition,
   cropWidth = DEFAULT_CROP_BOX_WIDTH,
   cropHeight = DEFAULT_CROP_BOX_HEIGHT,
   scale,
   rotation = 0,
   zoomSensitivity = 10,
+  positionInitialized = false,
+  isPlaying = false,
   onImageLoad,
+  onVideoLoad,
   onPositionChange,
   onScaleChange,
   onCropResize,
@@ -51,6 +64,8 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>(({
 }, ref) => {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const imageRef = useRef<HTMLImageElement | null>(null)
+  const videoRef = useRef<HTMLVideoElement | null>(null)
+  const renderRef = useRef<() => void>(() => {})
   const isDraggingRef = useRef(false)
   const isResizingRef = useRef(false)
   const dragStartRef = useRef({ x: 0, y: 0 })
@@ -68,12 +83,60 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>(({
     const img = new Image()
     img.onload = () => {
       imageRef.current = img
+      videoRef.current = null
       onImageLoad?.(img.naturalWidth, img.naturalHeight)
       render()
     }
     img.src = imageData
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [imageData])
+
+  // Load video when videoData changes
+  useEffect(() => {
+    if (!videoData) {
+      videoRef.current = null
+      render()
+      return
+    }
+
+    const video = document.createElement('video')
+    video.preload = 'metadata'
+    video.muted = true
+    video.playsInline = true
+    
+    video.onloadedmetadata = () => {
+      videoRef.current = video
+      imageRef.current = null
+      onVideoLoad?.(video.videoWidth, video.videoHeight, video.duration)
+      // Seek to first frame
+      video.currentTime = 0
+    }
+    
+    video.onseeked = () => {
+      // Use ref to get the latest render function, not a captured closure
+      renderRef.current()
+    }
+    
+    video.src = videoData
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [videoData])
+
+  // Continuous rendering loop for playing video
+  useEffect(() => {
+    if (!isPlaying || !videoRef.current) return
+
+    let animationFrameId: number
+    const renderLoop = () => {
+      renderRef.current()
+      animationFrameId = requestAnimationFrame(renderLoop)
+    }
+
+    animationFrameId = requestAnimationFrame(renderLoop)
+
+    return () => {
+      cancelAnimationFrame(animationFrameId)
+    }
+  }, [isPlaying])
 
   // Render canvas
   const render = useCallback(() => {
@@ -114,6 +177,38 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>(({
       } else {
         ctx.drawImage(
           img,
+          imagePosition.x,
+          imagePosition.y,
+          scaledWidth,
+          scaledHeight
+        )
+      }
+    }
+
+    // Draw video if loaded
+    if (videoRef.current) {
+      const video = videoRef.current
+      const scaledWidth = video.videoWidth * scale
+      const scaledHeight = video.videoHeight * scale
+
+      if (rotation !== 0) {
+        // Save context and apply rotation
+        ctx.save()
+        const centerX = imagePosition.x + scaledWidth / 2
+        const centerY = imagePosition.y + scaledHeight / 2
+        ctx.translate(centerX, centerY)
+        ctx.rotate((rotation * Math.PI) / 180)
+        ctx.drawImage(
+          video,
+          -scaledWidth / 2,
+          -scaledHeight / 2,
+          scaledWidth,
+          scaledHeight
+        )
+        ctx.restore()
+      } else {
+        ctx.drawImage(
+          video,
           imagePosition.x,
           imagePosition.y,
           scaledWidth,
@@ -164,12 +259,21 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>(({
     ctx.stroke()
     
     ctx.restore()
-  }, [imagePosition, scale, rotation, cropWidth, cropHeight])
+  }, [imagePosition, scale, rotation, cropWidth, cropHeight, positionInitialized])
+
+  // Keep renderRef up to date with the latest render function
+  useEffect(() => {
+    renderRef.current = render
+  }, [render])
 
   // Re-render when state changes
   useEffect(() => {
+    // Don't render video until position is initialized
+    if (videoRef.current && !positionInitialized) {
+      return
+    }
     render()
-  }, [render])
+  }, [render, positionInitialized, videoRef])
 
   // Handle canvas resize
   useEffect(() => {
@@ -226,8 +330,8 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>(({
         mouseX: e.clientX,
         mouseY: e.clientY
       }
-    } else if (imageRef.current) {
-      // Start dragging image
+    } else if (imageRef.current || videoRef.current) {
+      // Start dragging image/video
       isDraggingRef.current = true
       dragStartRef.current = {
         x: e.clientX - imagePosition.x,
@@ -247,8 +351,8 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>(({
       
       // Force a re-render to show the visual change
       render()
-    } else if (isDraggingRef.current && imageRef.current) {
-      // Handle image drag
+    } else if (isDraggingRef.current && (imageRef.current || videoRef.current)) {
+      // Handle image/video drag
       const newX = e.clientX - dragStartRef.current.x
       const newY = e.clientY - dragStartRef.current.y
       
@@ -269,7 +373,7 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>(({
 
   // Mouse wheel zoom
   const handleWheel = (e: React.WheelEvent<HTMLCanvasElement>) => {
-    if (!imageRef.current) return
+    if (!imageRef.current && !videoRef.current) return
     e.preventDefault()
 
     const canvas = canvasRef.current
@@ -298,7 +402,7 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>(({
   useImperativeHandle(ref, () => ({
     getCroppedCanvas: () => {
       const canvas = canvasRef.current
-      if (!canvas || !imageRef.current) return null
+      if (!canvas || (!imageRef.current && !videoRef.current)) return null
 
       const canvasWidth = canvas.width
       const canvasHeight = canvas.height
@@ -316,9 +420,10 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>(({
 
       if (rotation !== 0) {
         // Match the display rendering exactly
-        const img = imageRef.current
-        const scaledWidth = img.naturalWidth * scale
-        const scaledHeight = img.naturalHeight * scale
+        const media = imageRef.current || videoRef.current
+        if (!media) return null
+        const scaledWidth = (imageRef.current ? imageRef.current.naturalWidth : videoRef.current!.videoWidth) * scale
+        const scaledHeight = (imageRef.current ? imageRef.current.naturalHeight : videoRef.current!.videoHeight) * scale
 
         // Create a large temporary canvas to render the full rotated scene
         const tempCanvas = document.createElement('canvas')
@@ -334,7 +439,7 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>(({
         tempCtx.translate(centerX, centerY)
         tempCtx.rotate((rotation * Math.PI) / 180)
         tempCtx.drawImage(
-          img,
+          media,
           -scaledWidth / 2,
           -scaledHeight / 2,
           scaledWidth,
@@ -356,13 +461,15 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>(({
         )
       } else {
         // No rotation - use simple rectangular crop
+        const media = imageRef.current || videoRef.current
+        if (!media) return null
         const sourceX = (cropBoxX - imagePosition.x) / scale
         const sourceY = (cropBoxY - imagePosition.y) / scale
         const sourceWidth = cropWidth / scale
         const sourceHeight = cropHeight / scale
 
         ctx.drawImage(
-          imageRef.current,
+          media,
           sourceX,
           sourceY,
           sourceWidth,
@@ -381,6 +488,8 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>(({
       if (!canvas) {
         return {
           image: null,
+          video: null,
+          mediaType: null,
           position: { x: 0, y: 0 },
           scale: 1,
           cropBox: { centerX: 0, centerY: 0, width: cropWidth, height: cropHeight }
@@ -389,6 +498,8 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>(({
 
       return {
         image: imageRef.current,
+        video: videoRef.current,
+        mediaType: videoRef.current ? 'video' : imageRef.current ? 'image' : null,
         position: imagePosition,
         scale,
         cropBox: {
@@ -398,7 +509,8 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>(({
           height: cropHeight
         }
       }
-    }
+    },
+    getVideoElement: () => videoRef.current
   }))
 
   return (

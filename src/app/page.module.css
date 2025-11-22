@@ -7,6 +7,53 @@
   color: #e0e0e0;
 }
 
+.compatWarning {
+  position: fixed;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2000;
+  max-width: 600px;
+  width: 90%;
+}
+
+.compatContent {
+  background-color: #ff9800;
+  color: #1a1a1a;
+  padding: 16px 20px;
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+}
+
+.compatContent strong {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 16px;
+}
+
+.compatContent p {
+  margin: 8px 0;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.dismissBtn {
+  margin-top: 12px;
+  background-color: #1a1a1a;
+  color: #ffffff;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.dismissBtn:hover {
+  background-color: #333;
+}
+
 .welcomeOverlay {
   position: absolute;
   inset: 0;
@@ -21,6 +68,37 @@
 .welcomeContent {
   text-align: center;
   color: #999;
+}
+
+.uploadButton {
+  display: inline-block;
+  padding: 12px 32px;
+  background-color: #4a9eff;
+  color: #ffffff;
+  font-size: 16px;
+  font-weight: 500;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  pointer-events: auto;
+  margin-bottom: 16px;
+}
+
+.uploadButton:hover {
+  background-color: #3a8eef;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(74, 158, 255, 0.3);
+}
+
+.uploadButton:active {
+  transform: translateY(0);
+}
+
+.orText {
+  font-size: 14px;
+  color: #888;
+  margin: 12px 0;
+  font-weight: 500;
 }
 
 .welcomeTitle {

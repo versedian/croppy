@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
-import TopLeftMenu from '@/components/TopLeftMenu'
 import TopRightMenu from '@/components/TopRightMenu'
 import HelpOverlay from '@/components/HelpOverlay'
 import UtilityBar from '@/components/UtilityBar'
@@ -15,6 +14,7 @@ const DEFAULT_CROP_BOX_HEIGHT = 1216
 
 export default function Home() {
   const canvasRef = useRef<CanvasRef>(null)
+  const [positionInitialized, setPositionInitialized] = useState(false)
   const [imagePosition, setImagePosition] = useState({ x: 0, y: 0 })
   const [scale, setScale] = useState(1.0)
   const [rotation, setRotation] = useState(0)
@@ -26,24 +26,129 @@ export default function Home() {
   const [originalHeight, setOriginalHeight] = useState(0)
   const [imageLoaded, setImageLoaded] = useState(false)
   const [imageData, setImageData] = useState<string | null>(null)
+  const [videoData, setVideoData] = useState<string | null>(null)
+  const [mediaType, setMediaType] = useState<'image' | 'video' | null>(null)
+  
+  // Video playback state
+  const [isPlaying, setIsPlaying] = useState(false)
+  const [currentTime, setCurrentTime] = useState(0)
+  const [duration, setDuration] = useState(0)
+  const [browserCompatError, setBrowserCompatError] = useState<string | null>(null)
 
-  // Process image blob from any source
-  const processImageBlob = (blob: Blob) => {
-    const url = URL.createObjectURL(blob)
-    console.log('Created object URL from blob:', url)
+  // Check browser compatibility on mount
+  useEffect(() => {
+    const checkCompatibility = () => {
+      const errors: string[] = []
+      
+      // Check for video element support
+      const video = document.createElement('video')
+      if (!video.canPlayType) {
+        errors.push('Video playback is not supported in this browser')
+      } else {
+        // Check for MP4 support - canPlayType returns '', 'maybe', or 'probably'
+        const mp4Support = video.canPlayType('video/mp4')
+        if (!mp4Support) {
+          errors.push('MP4 video format is not supported')
+        }
+      }
+      
+      // Check for canvas support
+      const canvas = document.createElement('canvas')
+      const ctx = canvas.getContext('2d')
+      if (!ctx) {
+        errors.push('Canvas 2D rendering is not supported')
+      }
+      
+      // Check for Blob/File API
+      if (!window.Blob || !window.File) {
+        errors.push('File handling APIs are not supported')
+      }
+      
+      if (errors.length > 0) {
+        setBrowserCompatError(
+          `Some features may not work in this browser:\\n${errors.join('\\n')}\\n\\nPlease use a modern browser (Chrome 90+, Firefox 88+, Safari 14+, Edge 90+)`
+        )
+      }
+    }
     
-    const img = new Image()
-    img.onload = () => {
-      console.log(`Image loaded: ${img.naturalWidth} x ${img.naturalHeight}`)
-      setImageData(url)
-      console.log('✅ Image pasted successfully!')
+    checkCompatibility()
+  }, [])
+
+  // Process image/video blob from any source
+  const processMediaBlob = (blob: Blob) => {
+    const url = URL.createObjectURL(blob)
+    const type = blob.type.startsWith('video/') ? 'video' : 'image'
+    
+    console.log(`Created object URL from ${type} blob:`, url)
+    
+    // Reset position initialization flag for new media
+    setPositionInitialized(false)
+    
+    if (type === 'video') {
+      const video = document.createElement('video')
+      video.preload = 'metadata'
+      video.onloadedmetadata = () => {
+        console.log(`Video loaded: ${video.videoWidth} x ${video.videoHeight}, duration: ${video.duration}s`)
+        setVideoData(url)
+        setImageData(null)
+        setMediaType('video')
+        setIsPlaying(false)
+        setCurrentTime(0)
+        console.log('✅ Video loaded successfully!')
+      }
+      video.onerror = () => {
+        console.error('Failed to load video blob')
+        URL.revokeObjectURL(url)
+        alert('Failed to load video. Please ensure it is a supported format (MP4/WebM).')
+      }
+      video.src = url
+    } else {
+      const img = new Image()
+      img.onload = () => {
+        console.log(`Image loaded: ${img.naturalWidth} x ${img.naturalHeight}`)
+        setImageData(url)
+        setVideoData(null)
+        setMediaType('image')
+        console.log('✅ Image loaded successfully!')
+      }
+      img.onerror = () => {
+        console.error('Failed to load image blob')
+        URL.revokeObjectURL(url)
+        alert('Failed to load image. Please try again.')
+      }
+      img.src = url
     }
-    img.onerror = () => {
-      console.error('Failed to load image blob')
-      URL.revokeObjectURL(url)
-      alert('Failed to load image. Please try again.')
+  }
+
+  // Handle video load from canvas
+  const handleVideoLoad = (width: number, height: number, videoDuration: number) => {
+    setOriginalWidth(width)
+    setOriginalHeight(height)
+    setImageLoaded(true)
+    setRotation(0)
+    setDuration(videoDuration)
+    
+    // Only center video on initial load, not on subsequent calls
+    if (positionInitialized) {
+      return
     }
-    img.src = url
+    
+    // Calculate initial scale and position to center video
+    const canvasElement = document.querySelector('canvas')
+    if (canvasElement) {
+      const canvasWidth = canvasElement.width
+      const canvasHeight = canvasElement.height
+      
+      const initialScale = 1.0
+      const scaledWidth = width * initialScale
+      const scaledHeight = height * initialScale
+      const x = (canvasWidth - scaledWidth) / 2
+      const y = (canvasHeight - scaledHeight) / 2
+      
+      setScale(initialScale)
+      setImagePosition({ x, y })
+      setPositionInitialized(true)
+    }
   }
 
   // Handle image load from canvas
@@ -52,6 +157,11 @@ export default function Home() {
     setOriginalHeight(height)
     setImageLoaded(true)
     setRotation(0) // Reset rotation on new image
+    
+    // Only center image on initial load, not on subsequent calls
+    if (positionInitialized) {
+      return
+    }
     
     // Calculate initial scale and position to center image
     const canvasElement = document.querySelector('canvas')
@@ -70,6 +180,7 @@ export default function Home() {
       
       setScale(initialScale)
       setImagePosition({ x, y })
+      setPositionInitialized(true)
     }
   }
 
@@ -191,13 +302,93 @@ export default function Home() {
   }, [imageLoaded, originalWidth, originalHeight, scale])
 
   const handleRemoveImage = () => {
-    console.log('Remove image from canvas')
+    console.log('Remove media from canvas')
     setImageLoaded(false)
     setOriginalWidth(0)
     setOriginalHeight(0)
     setImageData(null)
-    // Image is removed but user's clipboard is NOT modified
+    setVideoData(null)
+    setMediaType(null)
+    setIsPlaying(false)
+    setCurrentTime(0)
+    setDuration(0)
+    // Media is removed but user's clipboard is NOT modified
   }
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      processMediaBlob(file)
+    }
+  }
+
+  // Video playback controls
+  const handlePlayPause = async () => {
+    const video = canvasRef.current?.getVideoElement()
+    if (!video) return
+    
+    try {
+      if (video.paused) {
+        await video.play()
+        setIsPlaying(true)
+      } else {
+        video.pause()
+        setIsPlaying(false)
+      }
+    } catch (err) {
+      console.error('Play/pause failed:', err)
+    }
+  }
+
+  const handleSeek = (time: number) => {
+    const video = canvasRef.current?.getVideoElement()
+    if (!video) return
+    
+    video.currentTime = time
+    // Don't update position - let timeupdate event handle it
+  }
+
+  const handlePreviousFrame = () => {
+    const video = canvasRef.current?.getVideoElement()
+    if (!video) return
+    
+    // Assume 30fps, go back 1 frame (1/30 second)
+    const frameTime = 1 / 30
+    video.currentTime = Math.max(0, video.currentTime - frameTime)
+    // Don't update position here - keep current position
+  }
+
+  const handleNextFrame = () => {
+    const video = canvasRef.current?.getVideoElement()
+    if (!video) return
+    
+    // Assume 30fps, go forward 1 frame (1/30 second)
+    const frameTime = 1 / 30
+    video.currentTime = Math.min(video.duration, video.currentTime + frameTime)
+    // Don't update position here - keep current position
+  }
+
+  // Update current time while video is playing
+  useEffect(() => {
+    const video = canvasRef.current?.getVideoElement()
+    if (!video) return
+
+    const handleTimeUpdate = () => {
+      setCurrentTime(video.currentTime)
+    }
+
+    const handleEnded = () => {
+      setIsPlaying(false)
+    }
+
+    video.addEventListener('timeupdate', handleTimeUpdate)
+    video.addEventListener('ended', handleEnded)
+
+    return () => {
+      video.removeEventListener('timeupdate', handleTimeUpdate)
+      video.removeEventListener('ended', handleEnded)
+    }
+  }, [videoData])
 
   // Keyboard shortcuts - placed after all handlers are defined
   useEffect(() => {
@@ -221,6 +412,24 @@ export default function Home() {
         e.preventDefault()
         handleResetClick()
       }
+      
+      // Video playback controls
+      if (mediaType === 'video') {
+        if (e.code === 'Space') {
+          e.preventDefault()
+          handlePlayPause()
+        }
+        
+        if (e.key === 'ArrowLeft') {
+          e.preventDefault()
+          handlePreviousFrame()
+        }
+        
+        if (e.key === 'ArrowRight') {
+          e.preventDefault()
+          handleNextFrame()
+        }
+      }
     }
 
     const handlePaste = (e: ClipboardEvent) => {
@@ -228,12 +437,12 @@ export default function Home() {
       if (!items) return
       
       for (const item of items) {
-        if (item.type.startsWith('image/')) {
+        if (item.type.startsWith('image/') || item.type.startsWith('video/')) {
           e.preventDefault()
           const blob = item.getAsFile()
           if (blob) {
-            console.log('Image pasted from clipboard')
-            processImageBlob(blob)
+            console.log(`${item.type.startsWith('video/') ? 'Video' : 'Image'} pasted from clipboard`)
+            processMediaBlob(blob)
           }
           return
         }
@@ -246,7 +455,7 @@ export default function Home() {
       window.removeEventListener('keydown', handleKeyDown)
       window.removeEventListener('paste', handlePaste)
     }
-  }, [showHelp, imageLoaded, handleCopyClick, handleDownloadClick, handleResetClick])
+  }, [showHelp, imageLoaded, mediaType, handleCopyClick, handleDownloadClick, handleResetClick])
 
   // Drag and drop support for files
   const handleDragOver = (e: React.DragEvent) => {
@@ -261,10 +470,10 @@ export default function Home() {
     const files = e.dataTransfer?.files
     if (!files) return
     
-    // Look for image files
+    // Look for image/video files
     for (const file of files) {
-      if (file.type.startsWith('image/')) {
-        processImageBlob(file)
+      if (file.type.startsWith('image/') || file.type.startsWith('video/')) {
+        processMediaBlob(file)
         return
       }
     }
@@ -272,9 +481,23 @@ export default function Home() {
 
   return (
     <main className={styles.container}>
+      {browserCompatError && (
+        <div className={styles.compatWarning}>
+          <div className={styles.compatContent}>
+            <strong>⚠️ Browser Compatibility Warning</strong>
+            <p style={{ whiteSpace: 'pre-line' }}>{browserCompatError}</p>
+            <button onClick={() => setBrowserCompatError(null)} className={styles.dismissBtn}>
+              Dismiss
+            </button>
+          </div>
+        </div>
+      )}
+      
       <Canvas 
         ref={canvasRef}
         imageData={imageData}
+        videoData={videoData}
+        mediaType={mediaType}
         imagePosition={imagePosition}
         cropWidth={cropWidth}
         cropHeight={cropHeight}
@@ -282,32 +505,37 @@ export default function Home() {
         rotation={rotation}
         zoomSensitivity={zoomSensitivity}
         onImageLoad={handleImageLoad}
+        onVideoLoad={handleVideoLoad}
         onPositionChange={(x, y) => setImagePosition({ x, y })}
         onScaleChange={setScale}
         onCropResize={handleCropResize}
         onDragOver={handleDragOver}
         onDrop={handleDrop}
+        positionInitialized={positionInitialized}
+        isPlaying={isPlaying}
       >
         {/* Welcome message when no image loaded */}
         {!imageLoaded && (
           <div className={styles.welcomeOverlay}>
             <div className={styles.welcomeContent}>
-              <p className={styles.welcomeTitle}>Press <kbd>Ctrl+V</kbd> to paste an image</p>
-              <p className={styles.welcomeSubtitle}>Or drag and drop an image file</p>
+              <label htmlFor="file-upload" className={styles.uploadButton}>
+                Add File
+              </label>
+              <input
+                id="file-upload"
+                type="file"
+                accept="image/*,video/mp4,video/webm"
+                onChange={handleFileUpload}
+                style={{ display: 'none' }}
+              />
+              <p className={styles.orText}>or</p>
+              <p className={styles.welcomeTitle}>Press <kbd>Ctrl+V</kbd> to paste an image or video</p>
+              <p className={styles.welcomeSubtitle}>Or drag and drop a file (.jpg, .png, .mp4, .webm)</p>
               <p className={styles.welcomeHint}>Press <kbd>H</kbd> for keyboard shortcuts</p>
             </div>
           </div>
         )}
         
-        <TopLeftMenu 
-          onPositionChange={handleCropResize}
-          onHelpClick={() => setShowHelp(true)}
-          onRemoveImage={handleRemoveImage}
-          imageLoaded={imageLoaded}
-          cropWidth={cropWidth}
-          cropHeight={cropHeight}
-          onZoomSensitivityChange={setZoomSensitivity}
-        />
         <TopRightMenu 
           onCopyClick={handleCopyClick}
           onDownloadClick={handleDownloadClick}
@@ -321,6 +549,19 @@ export default function Home() {
           outputWidth={cropWidth}
           outputHeight={cropHeight}
           onRotationChange={setRotation}
+          onCropResize={handleCropResize}
+          onZoomSensitivityChange={setZoomSensitivity}
+          onHelpClick={() => setShowHelp(true)}
+          onRemoveImage={handleRemoveImage}
+          imageLoaded={imageLoaded}
+          isVideo={mediaType === 'video'}
+          isPlaying={isPlaying}
+          currentTime={currentTime}
+          duration={duration}
+          onPlayPause={handlePlayPause}
+          onSeek={handleSeek}
+          onPreviousFrame={handlePreviousFrame}
+          onNextFrame={handleNextFrame}
         />
       </Canvas>
       

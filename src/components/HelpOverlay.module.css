@@ -61,6 +61,16 @@
   gap: 12px;
 }
 
+.sectionHeader {
+  font-size: 13px;
+  font-weight: 600;
+  color: #4a9eff;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-top: 12px;
+  margin-bottom: 4px;
+}
+
 .shortcutRow {
   display: flex;
   justify-content: space-between;
