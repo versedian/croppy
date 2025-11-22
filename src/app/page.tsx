@@ -345,7 +345,7 @@ export default function Home() {
     if (!video) return
     
     video.currentTime = time
-    // Don't update position - let timeupdate event handle it
+    setCurrentTime(time)
   }
 
   const handlePreviousFrame = () => {
@@ -354,8 +354,9 @@ export default function Home() {
     
     // Assume 30fps, go back 1 frame (1/30 second)
     const frameTime = 1 / 30
-    video.currentTime = Math.max(0, video.currentTime - frameTime)
-    // Don't update position here - keep current position
+    const newTime = Math.max(0, video.currentTime - frameTime)
+    video.currentTime = newTime
+    setCurrentTime(newTime)
   }
 
   const handleNextFrame = () => {
@@ -364,8 +365,9 @@ export default function Home() {
     
     // Assume 30fps, go forward 1 frame (1/30 second)
     const frameTime = 1 / 30
-    video.currentTime = Math.min(video.duration, video.currentTime + frameTime)
-    // Don't update position here - keep current position
+    const newTime = Math.min(video.duration, video.currentTime + frameTime)
+    video.currentTime = newTime
+    setCurrentTime(newTime)
   }
 
   // Update current time while video is playing
@@ -513,6 +515,7 @@ export default function Home() {
         onDrop={handleDrop}
         positionInitialized={positionInitialized}
         isPlaying={isPlaying}
+        onTimeUpdate={setCurrentTime}
       >
         {/* Welcome message when no image loaded */}
         {!imageLoaded && (

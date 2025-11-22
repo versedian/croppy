@@ -23,6 +23,7 @@ interface CanvasProps {
   onCropResize?: (width: number, height: number) => void
   onDragOver?: (e: React.DragEvent) => void
   onDrop?: (e: React.DragEvent) => void
+  onTimeUpdate?: (currentTime: number) => void
 }
 
 export interface CanvasRef {
@@ -60,7 +61,8 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>(({
   onScaleChange,
   onCropResize,
   onDragOver,
-  onDrop
+  onDrop,
+  onTimeUpdate
 }, ref) => {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const imageRef = useRef<HTMLImageElement | null>(null)
@@ -128,6 +130,10 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>(({
     let animationFrameId: number
     const renderLoop = () => {
       renderRef.current()
+      // Update current time while playing
+      if (videoRef.current && onTimeUpdate) {
+        onTimeUpdate(videoRef.current.currentTime)
+      }
       animationFrameId = requestAnimationFrame(renderLoop)
     }
 
@@ -136,7 +142,7 @@ const Canvas = forwardRef<CanvasRef, CanvasProps>(({
     return () => {
       cancelAnimationFrame(animationFrameId)
     }
-  }, [isPlaying])
+  }, [isPlaying, onTimeUpdate])
 
   // Render canvas
   const render = useCallback(() => {
